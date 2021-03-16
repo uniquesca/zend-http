@@ -9,9 +9,26 @@ namespace ZendTest\Http\Response;
 
 use PHPUnit\Framework\TestCase;
 use Zend\Http\Response\Stream;
+use ZendTest\Http\TestAsset\ResponseStream;
 
 class ResponseStreamTest extends TestCase
 {
+
+    /** @var null|string */
+    private $tempFile;
+
+    public function setUp()
+    {
+        $this->tempFile = null;
+    }
+
+    public function tearDown()
+    {
+        if (null !== $this->tempFile && file_exists($this->tempFile)) {
+            unlink($this->tempFile);
+        }
+    }
+
     public function testResponseFactoryFromStringCreatesValidResponse()
     {
         $string = 'HTTP/1.0 200 OK' . "\r\n\r\n" . 'Foo Bar' . "\r\n";
@@ -38,6 +55,23 @@ class ResponseStreamTest extends TestCase
         $response = Stream::fromStream('', $stream);
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertEquals("Foo Bar\r\nBar Foo", $response->getBody());
+    }
+
+    /**
+     * @see https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-3007
+     */
+    public function testDestructionDoesNothingIfStreamIsNotAResourceAndStreamNameIsNotAString()
+    {
+        $this->tempFile = tempnam(sys_get_temp_dir(), 'lhrs');
+        $streamObject = new ResponseStream($this->tempFile);
+
+        $response = new Stream();
+        $response->setCleanup(true);
+        $response->setStreamName($streamObject);
+
+        unset($response);
+
+        $this->assertFileExists($this->tempFile);
     }
 
     public function testGzipResponse()
